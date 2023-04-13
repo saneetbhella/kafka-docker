@@ -7,12 +7,13 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
       ZOOKEEPER_AUTH_PROVIDER_SASL: org.apache.zookeeper.server.auth.SASLAuthenticationProvider
-      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/zookeeper_jaas.conf
+      KAFKA_OPTS: |
+        -Djava.security.auth.login.config=/etc/kafka/zookeeper_jaas.conf
+        -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
     ports:
       - 2181:2181
     volumes:
       - ./zookeeper_jaas.conf:/etc/kafka/zookeeper_jaas.conf
-
   kafka:
     container_name: kafka
     image: confluentinc/cp-kafka:latest
@@ -25,16 +26,21 @@ services:
       KAFKA_CREATE_TOPICS: payments:1:1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,EXTERNAL://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_SSL
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      KAFKA_SECURITY_PROTOCOL: SASL_SSL
       KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
       KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+      KAFKA_SSL_KEYSTORE_LOCATION: /certs/server.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: kafkadocker
+      KAFKA_SSL_KEY_PASSWORD: kafkadocker
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: kafkadocker
     volumes:
       - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+      - ./certs/kafka:/certs
       # - ./kafka/data:/var/lib/kafka/data -- to preserve data
-
   schema-registry:
     container_name: schema-registry
     image: confluentinc/cp-schema-registry:latest
