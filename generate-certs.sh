@@ -44,3 +44,8 @@ keytool -noprompt -keyalg RSA -keystore client.keystore.jks -exportcert -alias C
 
 ## 12. Remove unnecessary files
 rm ca-key ca-cert ca-cert.srl cert_and_key.p12 cert-signed cert-unsigned client.keystore.jks
+
+## 13. Add credentials to file
+cat > kafka-credentials << EOF
+kafkadocker
+EOF

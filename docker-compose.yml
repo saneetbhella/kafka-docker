@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   zookeeper:
     container_name: zookeeper
@@ -25,21 +25,23 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_CREATE_TOPICS: payments:1:1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,EXTERNAL://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_SSL
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,EXTERNAL:SASL_SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_SECURITY_PROTOCOL: SASL_SSL
       KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
-      KAFKA_SSL_KEYSTORE_LOCATION: /certs/server.keystore.jks
-      KAFKA_SSL_KEYSTORE_PASSWORD: kafkadocker
-      KAFKA_SSL_KEY_PASSWORD: kafkadocker
-      KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/server.truststore.jks
-      KAFKA_SSL_TRUSTSTORE_PASSWORD: kafkadocker
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka-credentials
+      KAFKA_SSL_KEY_CREDENTIALS: kafka-credentials
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka-credentials
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      KAFKA_SSL_CLIENT_AUTH: requested
     volumes:
       - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
-      - ./certs/kafka:/certs
+      - ./certs/kafka:/etc/kafka/secrets
       # - ./kafka/data:/var/lib/kafka/data -- to preserve data
   schema-registry:
     container_name: schema-registry
@@ -53,4 +55,41 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9093
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SSL://kafka:9093
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SSL
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/server.keystore.jks
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEYSTORE_PASSWORD: kafkadocker
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEY_PASSWORD: kafkadocker
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/server.truststore.jks
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_PASSWORD: kafkadocker
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - ./certs/kafka:/etc/kafka/secrets
+  akhq:
+    container_name: akhq
+    image: tchiotludo/akhq
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+      - kafka
+      - schema-registry
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            docker-kafka-server:
+              properties:
+                bootstrap.servers: kafka:9093
+                security.protocol: SSL
+                ssl.endpoint.identification.algorithm: ""
+                ssl.keystore.location: /etc/kafka/secrets/server.keystore.jks
+                ssl.keystore.password: kafkadocker
+                ssl.key.password: kafkadocker
+                ssl.truststore.location: /etc/kafka/secrets/server.truststore.jks
+                ssl.truststore.password: kafkadocker
+              schema-registry:
+                url: http://schema-registry:8081
+    ports:
+      - 8080:8080
+    volumes:
+      - ./certs/kafka:/etc/kafka/secrets
